@@ -1,0 +1,17 @@
+Python
+pycache/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+
+IDE / Editor specific
+.vscode/
+.idea/
+*.suo
+.ntvs
+*.njsproj
+*.sln
+*.swp

@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Automated Gofile Link Checker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1f2937; }
+        ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+        .copied-toast { visibility: hidden; opacity: 0; transition: all 0.3s ease-in-out; }
+        .copied-toast.show { visibility: visible; opacity: 1; }
+        .spinner {
+            border: 2px solid #4b5563;
+            border-top: 2px solid #6366f1;
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-200 flex flex-col items-center min-h-screen p-4">
+
+    <div class="w-full max-w-2xl bg-gray-800 rounded-2xl shadow-lg p-6 md:p-8">
+        
+        <div class="text-center mb-6">
+            <h1 class="text-3xl md:text-4xl font-bold text-white mb-2">Automated Gofile Link Checker</h1>
+            <p class="text-gray-400">Generate and automatically check random links.</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <button id="generateBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg transition-transform transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-indigo-500 focus:ring-opacity-50 disabled:opacity-50">
+                Generate & Check Links
+            </button>
+            <button id="copyBtn" class="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-4 rounded-lg transition-transform transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-gray-500 focus:ring-opacity-50 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                Copy Alive Links
+            </button>
+        </div>
+        
+        <div class="flex justify-between items-center bg-gray-900/50 p-3 rounded-lg mb-4 text-sm">
+             <span class="font-semibold">Status:</span>
+             <div class="flex space-x-4">
+                <span id="aliveCount" class="text-green-400">✅ Alive: 0</span>
+                <span id="deadCount" class="text-red-400">❌ Dead: 0</span>
+                <span id="checkingCount" class="text-yellow-400">⌛ Checking: 0</span>
+             </div>
+        </div>
+
+        <div id="results-container" class="bg-gray-900 rounded-lg p-4 h-96 overflow-y-auto border border-gray-700">
+            <div id="placeholder" class="flex items-center justify-center h-full text-gray-500">
+                <p>Click "Generate" to start...</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="copyToast" class="copied-toast fixed bottom-5 bg-green-500 text-white py-2 px-4 rounded-lg shadow-lg">
+        Copied to clipboard!
+    </div>
+
+    <footer class="mt-8 text-center text-gray-500 text-sm">
+        <p><strong>Disclaimer:</strong> This tool is for educational purposes only. Use responsibly.</p>
+    </footer>
+
+    <script>
+        const generateBtn = document.getElementById('generateBtn');
+        const copyBtn = document.getElementById('copyBtn');
+        const resultsContainer = document.getElementById('results-container');
+        const placeholder = document.getElementById('placeholder');
+        const aliveCountEl = document.getElementById('aliveCount');
+        const deadCountEl = document.getElementById('deadCount');
+        const checkingCountEl = document.getElementById('checkingCount');
+        const copyToast = document.getElementById('copyToast');
+
+        let links = [];
+        let isChecking = false;
+
+        const BASE_URL = 'https://gofile.io/d/';
+        const CHECKER_API_URL = 'http://127.0.0.1:5000/check';
+        const CHARSET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+        const CODE_LENGTH = 6;
+        const BATCH_SIZE = 10;
+
+        function generateRandomCode() {
+            let result = '';
+            for (let i = 0; i < CODE_LENGTH; i++) {
+                result += CHARSET.charAt(Math.floor(Math.random() * CHARSET.length));
+            }
+            return result;
+        }
+        
+        function updateStats() {
+            const alive = links.filter(l => l.status === 'alive').length;
+            const dead = links.filter(l => l.status === 'dead').length;
+            const checking = links.filter(l => l.status === 'checking').length;
+
+            aliveCountEl.textContent = `✅ Alive: ${alive}`;
+            deadCountEl.textContent = `❌ Dead: ${dead}`;
+            checkingCountEl.textContent = `⌛ Checking: ${checking}`;
+
+            copyBtn.disabled = alive === 0;
+            generateBtn.disabled = isChecking;
+            if (isChecking) {
+                generateBtn.textContent = 'Checking...';
+            } else {
+                generateBtn.textContent = 'Generate & Check Links';
+            }
+        }
+        
+        async function checkLinkStatus(linkData, linkElement) {
+            try {
+                const response = await fetch(CHECKER_API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: linkData.url })
+                });
+
+                if (!response.ok) throw new Error('Network response was not ok');
+                
+                const result = await response.json();
+                linkData.status = result.status;
+            } catch (error) {
+                console.error('Error checking link:', error);
+                linkData.status = 'error';
+            }
+            
+            // Update UI based on final status
+            const statusIndicator = linkElement.querySelector('.status-indicator');
+            linkElement.classList.remove('bg-gray-800');
+            
+            if (linkData.status === 'alive') {
+                statusIndicator.innerHTML = '<span class="text-green-400 text-xl">✅</span>';
+                linkElement.classList.add('bg-green-900/50');
+            } else {
+                statusIndicator.innerHTML = '<span class="text-red-400 text-xl">❌</span>';
+                linkElement.classList.add('bg-red-900/50');
+            }
+            updateStats();
+        }
+
+        async function generateAndCheckLinks() {
+            if (isChecking) return;
+            isChecking = true;
+            
+            resultsContainer.innerHTML = '';
+            if (placeholder) placeholder.style.display = 'none';
+            links = [];
+            updateStats();
+
+            const checkPromises = [];
+
+            for (let i = 0; i < BATCH_SIZE; i++) {
+                const randomCode = generateRandomCode();
+                const fullUrl = BASE_URL + randomCode;
+                const linkData = { id: i, url: fullUrl, status: 'checking' };
+                links.push(linkData);
+
+                const linkContainer = document.createElement('div');
+                linkContainer.className = 'link-item flex items-center justify-between p-3 bg-gray-800 rounded-md mb-2 transition-colors duration-300';
+                linkContainer.innerHTML = `
+                    <a href="${fullUrl}" target="_blank" rel="noopener noreferrer" class="text-indigo-400 truncate hover:underline">
+                        <span class="text-gray-400">gofile.io/d/</span><span class="font-mono font-bold text-indigo-300">${randomCode}</span>
+                    </a>
+                    <div class="status-indicator ml-4"><div class="spinner"></div></div>
+                `;
+                resultsContainer.appendChild(linkContainer);
+                
+                // Add the check promise to the array
+                checkPromises.push(checkLinkStatus(linkData, linkContainer));
+            }
+            
+            updateStats();
+
+            // Wait for all checks to complete
+            await Promise.all(checkPromises);
+            
+            isChecking = false;
+            updateStats();
+        }
+
+        function copyAliveLinks() {
+            const aliveLinks = links.filter(link => link.status === 'alive').map(link => link.url);
+            if (aliveLinks.length === 0) return;
+
+            navigator.clipboard.writeText(aliveLinks.join('\n')).then(() => {
+                copyToast.classList.add('show');
+                setTimeout(() => copyToast.classList.remove('show'), 2000);
+            });
+        }
+
+        generateBtn.addEventListener('click', generateAndCheckLinks);
+        copyBtn.addEventListener('click', copyAliveLinks);
+    </script>
+
+</body>
+</html>
