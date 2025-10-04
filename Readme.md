@@ -1,5 +1,5 @@
-Automated Gofile Link Checker
-This project is a web-based tool that automatically generates and verifies the status of random Gofile links. It uses a Python Flask backend to perform the checks and a clean HTML/JavaScript frontend to display the results in real-time.
+Automated Link Checker
+This project is a web-based tool that automatically generates and verifies the status of random links for any website. It uses a Python Flask backend to perform the checks and a clean HTML/JavaScript frontend to display the results in real-time.
 
 This tool solves the browser's CORS (Cross-Origin Resource Sharing) security limitations by delegating the URL checking to a server-side script, which can freely access external websites.
 
@@ -13,6 +13,8 @@ Clear Status Tracking: See a live count of alive, dead, and pending links.
 Copy Functionality: Easily copy all discovered "alive" links to your clipboard.
 
 Clean & Modern UI: A responsive and easy-to-use interface built with Tailwind CSS.
+
+Configurable: Set the base URL and the string that indicates an inactive link.
 
 Technical Architecture
 This project is composed of two main parts:
@@ -33,9 +35,9 @@ A lightweight web server built with Python and the Flask framework.
 
 It exposes a single API endpoint (/check).
 
-When it receives a URL, it uses the requests library to fetch the page's HTML content.
+When it receives a URL and an "inactive content string", it uses the requests library to fetch the page's HTML content.
 
-It checks the HTML for the specific string "This content does not exist" to determine if the link is active.
+It checks the HTML for the specific inactive string to determine if the link is active.
 
 It sends a simple JSON response ({'status': 'alive'} or {'status': 'dead'}) back to the frontend.
 
@@ -84,5 +86,7 @@ You should see output indicating that the server is running on http://127.0.0.1:
 
 Step 6: Run the Frontend
 Open the index.html file (located inside the templates folder) directly in your web browser (e.g., by double-clicking it).
+
+Enter the base URL for the links you want to check (e.g., https://gofile.io/d/) and the text that appears on a page when the content is not available (e.g., "This content does not exist").
 
 You can now use the tool! The frontend running in your browser will communicate with the Python server you started in the previous step.
